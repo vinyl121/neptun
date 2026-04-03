@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEPTUN — Трекер БПЛА</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#e0e0e0;overflow:hidden;height:100vh}
+
+/* Header */
+.header{display:flex;align-items:center;gap:16px;padding:8px 16px;background:#16213e;border-bottom:1px solid #0f3460;flex-wrap:wrap}
+.header h1{color:#00d4ff;font-size:20px;font-weight:700;letter-spacing:2px}
+.counter{background:#0f3460;padding:4px 12px;border-radius:12px;font-size:13px;font-weight:600}
+.counter.red{color:#ff3232}
+.counter.orange{color:#ffaa00}
+.status{margin-left:auto;color:#888;font-size:12px}
+.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#0f0;margin-right:4px;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Layout */
+.main{display:flex;height:calc(100vh - 46px)}
+
+/* Sidebar */
+.sidebar{width:280px;min-width:280px;background:#16213e;padding:10px;overflow-y:auto;border-right:1px solid #0f3460;display:flex;flex-direction:column;gap:8px}
+.sidebar::-webkit-scrollbar{width:4px}
+.sidebar::-webkit-scrollbar-thumb{background:#0f3460;border-radius:2px}
+.section-title{color:#00d4ff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
+.filter-row{display:flex;align-items:center;gap:6px;padding:2px 0}
+.filter-row input[type=checkbox]{accent-color:#00d4ff}
+.color-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.sep{border:none;border-top:1px solid #0f3460;margin:4px 0}
+
+/* City input */
+.city-block{display:flex;flex-direction:column;gap:4px}
+.city-input-row{display:flex;gap:4px}
+.city-input-row input{flex:1;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:5px 8px;border-radius:4px;font-size:13px;outline:none}
+.city-input-row input:focus{border-color:#00d4ff}
+.city-input-row button{background:#0f3460;color:#e0e0e0;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:12px}
+.city-input-row button:hover{background:#16213e}
+.city-status{font-size:11px;color:#888}
+.city-status.active{color:#00d4ff}
+
+/* Region checkboxes */
+.region-list{display:flex;flex-direction:column;gap:1px;max-height:300px;overflow-y:auto;padding-right:4px}
+.region-list::-webkit-scrollbar{width:3px}
+.region-list::-webkit-scrollbar-thumb{background:#0f3460}
+.region-list label{font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;padding:1px 0}
+.btn-row{display:flex;gap:4px}
+.btn-sm{background:#0f3460;color:#e0e0e0;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;flex:1}
+.btn-sm:hover{background:#1a1a2e}
+
+/* Map */
+.map-area{flex:1;display:flex;flex-direction:column}
+#map{flex:1}
+.leaflet-container{background:#1a1a2e}
+
+/* Table */
+.table-area{height:220px;overflow-y:auto;border-top:1px solid #0f3460;background:#16213e}
+.table-area table{width:100%;border-collapse:collapse;font-size:12px}
+.table-area th{background:#0f3460;color:#e0e0e0;padding:6px 8px;text-align:left;position:sticky;top:0;z-index:1}
+.table-area td{padding:4px 8px;border-bottom:1px solid #1a1a2e}
+.table-area tr:hover{background:#1a1a2e}
+
+/* Stats bar */
+.stats-bar{display:flex;justify-content:space-between;padding:4px 16px;background:#16213e;border-top:1px solid #0f3460;font-size:11px}
+.stats-bar .left{color:#ff3232;font-weight:600}
+.stats-bar .right{color:#888}
+
+/* Custom markers */
+.drone-marker{position:relative;display:flex;align-items:center;justify-content:center}
+.drone-arrow{width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:20px solid #ff3232;filter:drop-shadow(0 0 3px rgba(255,50,50,.6))}
+.drone-badge{position:absolute;top:-8px;right:-10px;background:#ff3254;color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid #fff}
+
+/* Notification popup */
+.notification{position:fixed;bottom:20px;right:20px;width:360px;background:#16213e;border:1px solid #ff3232;border-radius:8px;overflow:hidden;z-index:10000;animation:slideIn .3s;box-shadow:0 4px 20px rgba(255,50,50,.3)}
+.notification .n-title{background:#ff3232;color:#fff;padding:8px 12px;font-weight:600;font-size:13px}
+.notification .n-body{padding:10px 12px;font-size:12px;line-height:1.5;color:#ccc}
+.notification .n-close{position:absolute;top:6px;right:10px;color:#fff;cursor:pointer;font-size:16px;opacity:.7}
+.notification .n-close:hover{opacity:1}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+@media(max-width:768px){
+  .sidebar{display:none}
+  .header{padding:6px 10px}
+  .header h1{font-size:16px}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>NEPTUN</h1>
+  <span class="counter red" id="cntTargets">Targets: —</span>
+  <span class="counter orange" id="cntAlarms">Alerts: —</span>
+  <span class="status" id="statusText"><span class="live-dot"></span>Loading...</span>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+    <!-- Threat types -->
+    <div class="section-title">Types</div>
+    <div id="threatFilters"></div>
+
+    <hr class="sep">
+
+    <!-- Display options -->
+    <div class="section-title">Display</div>
+    <label class="filter-row"><input type="checkbox" id="chkTrajectory" checked> Trajectories</label>
+    <label class="filter-row"><input type="checkbox" id="chkPrediction" checked> Predicted route</label>
+    <label class="filter-row"><input type="checkbox" id="chkAlarms" checked> Region alerts</label>
+
+    <hr class="sep">
+
+    <!-- City notifications -->
+    <div class="section-title">Notify city</div>
+    <div class="city-block">
+      <div class="city-input-row">
+        <input type="text" id="cityInput" placeholder="City name..." list="cityList">
+        <datalist id="cityList"></datalist>
+        <button onclick="applyCity()">OK</button>
+      </div>
+      <div class="city-status" id="cityStatus">No city — no alerts</div>
+    </div>
+
+    <hr class="sep">
+
+    <!-- Regions -->
+    <div class="section-title">Regions</div>
+    <div class="btn-row">
+      <button class="btn-sm" onclick="selectAllRegions(true)">All</button>
+      <button class="btn-sm" onclick="selectAllRegions(false)">None</button>
+    </div>
+    <div class="region-list" id="regionList"></div>
+  </div>
+
+  <div class="map-area">
+    <div id="map"></div>
+    <div class="table-area">
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Count</th>
+            <th>Region</th>
+            <th>Place</th>
+            <th>Dest</th>
+            <th>Speed</th>
+            <th>Bearing</th>
+            <th>Conf</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="stats-bar">
+  <span class="left" id="statsLeft"></span>
+  <span class="right" id="statsRight"></span>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════
+const API_DATA = 'https://neptun.in.ua/api/data';
+const API_ALARMS = 'https://neptun.in.ua/api/alarms/all';
+const POLL_DATA = 2000;
+const POLL_ALARMS = 10000;
+const NOTIFY_COOLDOWN = 30000;
+
+const THREAT_TYPES = {
+  shahed:        { label: 'Shahed',      color: '#FF3232', rgb: [255,50,50] },
+  rozved:        { label: 'Recon UAV',   color: '#FFAA00', rgb: [255,170,0] },
+  vibuh:         { label: 'Explosion',   color: '#FF00FF', rgb: [255,0,255] },
+  uav:           { label: 'UAV',         color: '#FF6600', rgb: [255,102,0] },
+  missile:       { label: 'Missile',     color: '#CC00FF', rgb: [204,0,255] },
+  cruise_missile:{ label: 'Cruise mis.', color: '#CC00FF', rgb: [204,0,255] },
+  ballistic:     { label: 'Ballistic',   color: '#FF0066', rgb: [255,0,102] },
+};
+
+const REGIONS = {
+  "Вінницька область":[49.2331,28.4682],"Волинська область":[50.7472,25.3254],
+  "Дніпропетровська область":[48.4647,35.0462],"Донецька область":[48.0159,37.8028],
+  "Житомирська область":[50.2547,28.6587],"Закарпатська область":[48.6208,22.2879],
+  "Запорізька область":[47.8388,35.1396],"Івано-Франківська область":[48.9226,24.7111],
+  "Київська область":[50.053,30.7667],"Кіровоградська область":[48.5079,32.2623],
+  "Луганська область":[48.574,39.3078],"Львівська область":[49.8397,24.0297],
+  "Миколаївська область":[46.975,31.9946],"Одеська область":[46.4846,30.7326],
+  "Полтавська область":[49.5883,34.5514],"Рівненська область":[50.6199,26.2516],
+  "Сумська область":[50.9077,34.7981],"Тернопільська область":[49.5535,25.5948],
+  "Харківська область":[49.9935,36.2304],"Херсонська область":[46.6354,32.6169],
+  "Хмельницька область":[49.423,26.9871],"Черкаська область":[49.4444,32.0598],
+  "Чернівецька область":[48.292,25.9358],"Чернігівська область":[51.4982,31.2893],
+  "м. Київ":[50.4501,30.5234]
+};
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let markersVersion = null;
+let targetsData = [];
+let alarmsData = [];
+let fetchCount = 0, skipCount = 0;
+let watchCity = '';
+let knownTrackIds = new Set();
+let notifiedTimes = {};
+
+// Map layers
+let map, droneMarkers = [], pathLayers = [], alarmMarkers = [];
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  initFilters();
+  initRegions();
+  pollData();
+  pollAlarms();
+  setInterval(pollData, POLL_DATA);
+  setInterval(pollAlarms, POLL_ALARMS);
+});
+
+function initMap() {
+  map = L.map('map', { zoomControl: true }).setView([48.38, 31.17], 6);
+  L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&hl=uk', {
+    maxZoom: 18,
+    attribution: 'neptun.in.ua'
+  }).addTo(map);
+}
+
+function initFilters() {
+  const el = document.getElementById('threatFilters');
+  for (const [key, info] of Object.entries(THREAT_TYPES)) {
+    const row = document.createElement('label');
+    row.className = 'filter-row';
+    row.innerHTML = `<input type="checkbox" checked data-threat="${key}">` +
+      `<span class="color-dot" style="background:${info.color}"></span> ${info.label}`;
+    row.querySelector('input').addEventListener('change', updateDisplay);
+    el.appendChild(row);
+  }
+}
+
+function initRegions() {
+  const el = document.getElementById('regionList');
+  for (const name of Object.keys(REGIONS).sort()) {
+    const lbl = document.createElement('label');
+    lbl.innerHTML = `<input type="checkbox" checked data-region="${name}"> ${name}`;
+    lbl.querySelector('input').addEventListener('change', updateDisplay);
+    el.appendChild(lbl);
+  }
+}
+
+function selectAllRegions(val) {
+  document.querySelectorAll('[data-region]').forEach(cb => cb.checked = val);
+  updateDisplay();
+}
+
+// ═══════════════════════════════════════════════
+// NETWORK
+// ═══════════════════════════════════════════════
+async function pollData() {
+  try {
+    const resp = await fetch(API_DATA);
+    const d = await resp.json();
+    fetchCount++;
+    const newVer = d.markers_version;
+    if (newVer !== markersVersion) {
+      markersVersion = newVer;
+      targetsData = d.tracks || [];
+      checkNotifications(targetsData);
+      updateDisplay();
+      updateCityAutocomplete();
+      document.getElementById('statusText').innerHTML =
+        `<span class="live-dot"></span>LIVE ${new Date().toLocaleTimeString()}`;
+    } else {
+      skipCount++;
+    }
+  } catch (e) {
+    document.getElementById('statusText').textContent = 'Connection error';
+  }
+}
+
+async function pollAlarms() {
+  try {
+    const resp = await fetch(API_ALARMS);
+    alarmsData = await resp.json();
+    updateDisplay();
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════
+// DISPLAY
+// ═══════════════════════════════════════════════
+function getActiveThreats() {
+  const s = new Set();
+  document.querySelectorAll('[data-threat]:checked').forEach(cb => s.add(cb.dataset.threat));
+  return s;
+}
+
+function getActiveRegions() {
+  const s = new Set();
+  document.querySelectorAll('[data-region]:checked').forEach(cb => s.add(cb.dataset.region));
+  return s;
+}
+
+function findNearestRegion(lat, lng) {
+  let min = Infinity, nearest = '';
+  for (const [name, [rlat, rlng]] of Object.entries(REGIONS)) {
+    const d = Math.sqrt((lat-rlat)**2 + (lng-rlng)**2);
+    if (d < min) { min = d; nearest = name; }
+  }
+  return nearest;
+}
+
+function getDestination(t) {
+  const traj = t.trajectory;
+  if (traj && traj.end) return findNearestRegion(traj.end[0], traj.end[1]);
+  return t.course_direction || '';
+}
+
+function createDroneIcon(bearing, color, count) {
+  const angle = (bearing || 0);
+  const svg = `<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+    <g transform="rotate(${angle} 16 16)">
+      <polygon points="16,2 22,26 16,20 10,26" fill="${color}" stroke="#fff" stroke-width="1.5" opacity="0.85"/>
+    </g>
+    ${count > 1 ? `<circle cx="26" cy="6" r="7" fill="#ff3254" stroke="#fff" stroke-width="1"/>
+      <text x="26" y="9.5" text-anchor="middle" fill="#fff" font-size="8" font-weight="bold">${count}</text>` : ''}
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    className: ''
+  });
+}
+
+function updateDisplay() {
+  const threats = getActiveThreats();
+  const regions = getActiveRegions();
+  const showTraj = document.getElementById('chkTrajectory').checked;
+  const showPred = document.getElementById('chkPrediction').checked;
+  const showAlarms = document.getElementById('chkAlarms').checked;
+
+  // Clear
+  droneMarkers.forEach(m => map.removeLayer(m));
+  pathLayers.forEach(p => map.removeLayer(p));
+  alarmMarkers.forEach(m => map.removeLayer(m));
+  droneMarkers = []; pathLayers = []; alarmMarkers = [];
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+
+  let targetCount = 0, totalDrones = 0;
+  const typeCounts = {};
+
+  for (const t of targetsData) {
+    const ttype = t.threat_type || 'unknown';
+    const region = t.region || '';
+    if (!threats.has(ttype)) continue;
+    if (region && !regions.has(region)) continue;
+
+    const info = THREAT_TYPES[ttype] || { label: ttype, color: '#B4B4B4' };
+    const count = t.count || 1;
+    const bearing = t.ticker_bearing || t.course_bearing || 0;
+    const dest = getDestination(t);
+
+    targetCount++;
+    totalDrones += count;
+    typeCounts[ttype] = (typeCounts[ttype] || 0) + count;
+
+    let timeStr = '-';
+    try { timeStr = new Date(t.date).toLocaleTimeString(); } catch(e) {}
+
+    // Table row
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="color:${info.color}">${info.label}</td>
+      <td>${count}</td><td>${region}</td><td>${t.place||''}</td>
+      <td>${dest}</td><td>${t.speed_kmh ? t.speed_kmh+' km/h' : '-'}</td>
+      <td>${bearing ? Math.round(bearing)+'°' : '-'}</td>
+      <td>${t.confidence_0_100 ? t.confidence_0_100+'%' : '-'}</td>
+      <td>${timeStr}</td>`;
+    tbody.appendChild(tr);
+
+    // Map marker
+    if (t.lat && t.lng) {
+      const icon = createDroneIcon(bearing, info.color, count);
+      const marker = L.marker([t.lat, t.lng], { icon })
+        .bindPopup(`<b>${info.label} x${count}</b><br>${t.place||''}<br>${region}<br>` +
+          `Speed: ${t.speed_kmh||'-'} km/h<br>Dest: ${dest}`);
+      marker.addTo(map);
+      droneMarkers.push(marker);
+
+      // Trajectory
+      if (showTraj && t.positions && t.positions.length >= 2) {
+        const pts = t.positions.map(p => [p.lat, p.lng]);
+        pts.push([t.lat, t.lng]);
+        const path = L.polyline(pts, { color: info.color, weight: 2, opacity: 0.7 }).addTo(map);
+        pathLayers.push(path);
+      }
+
+      // Prediction
+      if (showPred && t.trajectory && t.trajectory.end) {
+        const end = t.trajectory.end;
+        const pred = L.polyline([[t.lat, t.lng], end], {
+          color: '#FFFF00', weight: 1.5, opacity: 0.6, dashArray: '6,4'
+        }).addTo(map);
+        pathLayers.push(pred);
+      }
+    }
+  }
+
+  // Alarms
+  let alarmCount = 0;
+  if (showAlarms) {
+    for (const entry of alarmsData) {
+      if (entry.regionType !== 'State') continue;
+      if (!entry.activeAlerts?.some(a => a.type === 'AIR')) continue;
+      const rn = entry.regionName;
+      if (!regions.has(rn)) continue;
+      alarmCount++;
+      const coords = REGIONS[rn];
+      if (coords) {
+        const circle = L.circleMarker(coords, {
+          radius: 12, color: '#ff0000', fillColor: '#ff0000',
+          fillOpacity: 0.2, weight: 2, opacity: 0.6
+        }).bindPopup(`<b>AIR ALERT</b><br>${rn}`).addTo(map);
+        alarmMarkers.push(circle);
+      }
+    }
+  }
+
+  // Counters
+  document.getElementById('cntTargets').textContent =
+    `Targets: ${targetCount} (${totalDrones})`;
+  document.getElementById('cntAlarms').textContent =
+    `Alerts: ${alarmCount}`;
+
+  const parts = Object.entries(typeCounts)
+    .sort((a,b) => b[1]-a[1])
+    .map(([tt,c]) => `${(THREAT_TYPES[tt]||{label:tt}).label}: ${c}`);
+  document.getElementById('statsLeft').textContent = parts.join(' | ') || 'No active targets';
+  document.getElementById('statsRight').textContent =
+    `${new Date().toLocaleTimeString()} | neptun.in.ua | v${markersVersion||'?'} req:${fetchCount} skip:${skipCount}`;
+}
+
+// ═══════════════════════════════════════════════
+// CITY FILTER & NOTIFICATIONS
+// ═══════════════════════════════════════════════
+function applyCity() {
+  watchCity = document.getElementById('cityInput').value.trim();
+  const statusEl = document.getElementById('cityStatus');
+  if (watchCity) {
+    statusEl.textContent = `Notify: ${watchCity}`;
+    statusEl.className = 'city-status active';
+    // Reset known tracks to trigger immediate check
+    knownTrackIds.clear();
+    notifiedTimes = {};
+    checkNotifications(targetsData);
+  } else {
+    statusEl.textContent = 'No city — no alerts';
+    statusEl.className = 'city-status';
+  }
+}
+
+function updateCityAutocomplete() {
+  const cities = new Set();
+  for (const t of targetsData) {
+    if (t.place) cities.add(t.place);
+    if (t.course_direction) cities.add(t.course_direction);
+  }
+  Object.keys(REGIONS).forEach(r => cities.add(r));
+  const dl = document.getElementById('cityList');
+  dl.innerHTML = '';
+  [...cities].sort().forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c;
+    dl.appendChild(opt);
+  });
+}
+
+function checkNotifications(tracks) {
+  if (!watchCity) {
+    knownTrackIds = new Set(tracks.map(t => t.track_id || t.id));
+    return;
+  }
+
+  const cityLow = watchCity.toLowerCase();
+  const now = Date.now();
+  const currentIds = new Set();
+
+  for (const t of tracks) {
+    const tid = t.track_id || t.id || '';
+    currentIds.add(tid);
+
+    if (notifiedTimes[tid] && now - notifiedTimes[tid] < NOTIFY_COOLDOWN) continue;
+    if (knownTrackIds.has(tid)) continue;
+
+    const info = THREAT_TYPES[t.threat_type] || { label: t.threat_type };
+    const dest = getDestination(t);
+    const place = t.place || '';
+    const region = t.region || '';
+    const courseDir = t.course_direction || '';
+
+    const match = [dest, place, courseDir, region]
+      .some(s => s.toLowerCase().includes(cityLow));
+    if (!match) continue;
+
+    // Show notification
+    const title = `${info.label} x${t.count||1} -> ${watchCity}`;
+    const lines = [];
+    if (place) lines.push(`Place: ${place}`);
+    if (region) lines.push(`Region: ${region}`);
+    if (courseDir) lines.push(`Direction: ${courseDir}`);
+    if (dest) lines.push(`Target: ${dest}`);
+    if (t.speed_kmh) lines.push(`Speed: ${t.speed_kmh} km/h`);
+
+    showNotification(title, lines.join('\n'));
+    notifiedTimes[tid] = now;
+
+    // Browser notification
+    if (Notification.permission === 'granted') {
+      new Notification(title, { body: lines.join('\n'), icon: '🛸' });
+    }
+  }
+
+  knownTrackIds = currentIds;
+}
+
+function showNotification(title, body) {
+  const existing = document.querySelectorAll('.notification');
+  if (existing.length > 3) existing[0].remove();
+
+  const div = document.createElement('div');
+  div.className = 'notification';
+  div.innerHTML = `<div class="n-title">${title}<span class="n-close" onclick="this.parentElement.parentElement.remove()">&times;</span></div>
+    <div class="n-body">${body.replace(/\n/g, '<br>')}</div>`;
+  div.addEventListener('click', () => div.remove());
+  document.body.appendChild(div);
+
+  // Shift existing notifications up
+  const all = document.querySelectorAll('.notification');
+  all.forEach((n, i) => {
+    n.style.bottom = (20 + (all.length - 1 - i) * 150) + 'px';
+  });
+
+  setTimeout(() => { if (div.parentElement) div.remove(); }, 8000);
+}
+
+// Request browser notification permission
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+
+// Handle Enter on city input
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('cityInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') applyCity();
+  });
+});
+</script>
+</body>
+</html>
