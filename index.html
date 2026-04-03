@@ -11,7 +11,7 @@
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#e0e0e0;overflow:hidden;height:100vh}
 
 /* Header */
-.header{display:flex;align-items:center;gap:16px;padding:8px 16px;background:#16213e;border-bottom:1px solid #0f3460;flex-wrap:wrap}
+.header{display:flex;align-items:center;gap:10px;padding:8px 16px;background:#16213e;border-bottom:1px solid #0f3460;flex-wrap:wrap;min-height:46px}
 .header h1{color:#00d4ff;font-size:20px;font-weight:700;letter-spacing:2px}
 .counter{background:#0f3460;padding:4px 12px;border-radius:12px;font-size:13px;font-weight:600}
 .counter.red{color:#ff3232}
@@ -20,23 +20,27 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#e0e0e
 .live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#0f0;margin-right:4px;animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
+/* Menu button (mobile) */
+.menu-btn{display:none;background:none;border:1px solid #0f3460;color:#00d4ff;font-size:22px;line-height:1;padding:4px 8px;border-radius:4px;cursor:pointer;flex-shrink:0}
+.menu-btn:hover,.menu-btn:active{background:#0f3460}
+
 /* Layout */
-.main{display:flex;height:calc(100vh - 46px)}
+.main{display:flex;height:calc(100vh - 46px);position:relative}
 
 /* Sidebar */
-.sidebar{width:280px;min-width:280px;background:#16213e;padding:10px;overflow-y:auto;border-right:1px solid #0f3460;display:flex;flex-direction:column;gap:8px}
+.sidebar{width:280px;min-width:280px;background:#16213e;padding:10px;overflow-y:auto;border-right:1px solid #0f3460;display:flex;flex-direction:column;gap:8px;z-index:900}
 .sidebar::-webkit-scrollbar{width:4px}
 .sidebar::-webkit-scrollbar-thumb{background:#0f3460;border-radius:2px}
 .section-title{color:#00d4ff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
 .filter-row{display:flex;align-items:center;gap:6px;padding:2px 0}
-.filter-row input[type=checkbox]{accent-color:#00d4ff}
+.filter-row input[type=checkbox]{accent-color:#00d4ff;width:18px;height:18px}
 .color-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
 .sep{border:none;border-top:1px solid #0f3460;margin:4px 0}
 
 /* City input */
 .city-block{display:flex;flex-direction:column;gap:4px}
 .city-input-row{display:flex;gap:4px}
-.city-input-row input{flex:1;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:5px 8px;border-radius:4px;font-size:13px;outline:none}
+.city-input-row input{flex:1;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:5px 8px;border-radius:4px;font-size:14px;outline:none}
 .city-input-row input:focus{border-color:#00d4ff}
 .city-input-row button{background:#0f3460;color:#e0e0e0;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:12px}
 .city-input-row button:hover{background:#16213e}
@@ -48,24 +52,32 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#e0e0e
 .region-list::-webkit-scrollbar{width:3px}
 .region-list::-webkit-scrollbar-thumb{background:#0f3460}
 .region-list label{font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;padding:1px 0}
+.region-list input[type=checkbox]{width:18px;height:18px}
 .btn-row{display:flex;gap:4px}
 .btn-sm{background:#0f3460;color:#e0e0e0;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;flex:1}
 .btn-sm:hover{background:#1a1a2e}
 
+/* Sidebar overlay (mobile) */
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:899}
+
 /* Map */
-.map-area{flex:1;display:flex;flex-direction:column}
+.map-area{flex:1;display:flex;flex-direction:column;min-width:0}
 #map{flex:1}
 .leaflet-container{background:#1a1a2e}
+
+/* Table toggle */
+.table-toggle{display:none;background:#0f3460;color:#e0e0e0;border:none;width:100%;padding:8px;font-size:13px;font-weight:600;cursor:pointer;border-top:1px solid #0f3460}
+.table-toggle:hover{background:#16213e}
 
 /* Table */
 .table-area{height:220px;overflow-y:auto;border-top:1px solid #0f3460;background:#16213e}
 .table-area table{width:100%;border-collapse:collapse;font-size:12px}
-.table-area th{background:#0f3460;color:#e0e0e0;padding:6px 8px;text-align:left;position:sticky;top:0;z-index:1}
-.table-area td{padding:4px 8px;border-bottom:1px solid #1a1a2e}
+.table-area th{background:#0f3460;color:#e0e0e0;padding:6px 8px;text-align:left;position:sticky;top:0;z-index:1;white-space:nowrap}
+.table-area td{padding:4px 8px;border-bottom:1px solid #1a1a2e;white-space:nowrap}
 .table-area tr:hover{background:#1a1a2e}
 
 /* Stats bar */
-.stats-bar{display:flex;justify-content:space-between;padding:4px 16px;background:#16213e;border-top:1px solid #0f3460;font-size:11px}
+.stats-bar{display:flex;justify-content:space-between;padding:4px 16px;background:#16213e;border-top:1px solid #0f3460;font-size:11px;flex-wrap:wrap;gap:4px}
 .stats-bar .left{color:#ff3232;font-weight:600}
 .stats-bar .right{color:#888}
 
@@ -82,24 +94,66 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#e0e0e
 .notification .n-close:hover{opacity:1}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 
+/* ═══════════ MOBILE ═══════════ */
 @media(max-width:768px){
-  .sidebar{display:none}
-  .header{padding:6px 10px}
-  .header h1{font-size:16px}
+  .menu-btn{display:block}
+  .header{padding:6px 10px;gap:6px;min-height:42px}
+  .header h1{font-size:16px;letter-spacing:1px}
+  .counter{font-size:11px;padding:3px 8px}
+  .status{font-size:10px}
+
+  /* Sidebar becomes slide-over */
+  .sidebar{
+    position:fixed;top:0;left:0;bottom:0;width:280px;min-width:0;
+    transform:translateX(-100%);transition:transform .25s ease;
+    box-shadow:4px 0 20px rgba(0,0,0,.5);padding:14px 12px
+  }
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-overlay.show{display:block}
+
+  /* Sidebar close button */
+  .sidebar-close{display:block;background:none;border:none;color:#00d4ff;font-size:24px;cursor:pointer;position:absolute;top:8px;right:10px;z-index:5}
+
+  /* Table collapsible */
+  .table-toggle{display:block}
+  .table-area{height:auto;max-height:0;overflow:hidden;transition:max-height .3s ease}
+  .table-area.open{max-height:50vh;overflow-y:auto}
+  .table-area table{font-size:11px}
+  .table-area th,.table-area td{padding:4px 5px}
+
+  /* Notifications smaller */
+  .notification{width:calc(100vw - 24px);right:12px;bottom:12px}
+
+  /* Stats bar */
+  .stats-bar{padding:4px 10px;font-size:10px}
+
+  /* Map full width */
+  .main{height:calc(100vh - 42px)}
+}
+
+/* Extra small screens */
+@media(max-width:380px){
+  .header h1{font-size:14px}
+  .counter{font-size:10px;padding:2px 6px}
+  .sidebar{width:260px}
 }
 </style>
 </head>
 <body>
 
 <div class="header">
+  <button class="menu-btn" id="menuBtn" onclick="toggleSidebar()">&#9776;</button>
   <h1>NEPTUN</h1>
   <span class="counter red" id="cntTargets">Targets: —</span>
   <span class="counter orange" id="cntAlarms">Alerts: —</span>
   <span class="status" id="statusText"><span class="live-dot"></span>Loading...</span>
 </div>
 
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
 <div class="main">
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar">
+    <button class="sidebar-close" onclick="closeSidebar()" style="display:none">&times;</button>
     <!-- Threat types -->
     <div class="section-title">Types</div>
     <div id="threatFilters"></div>
@@ -138,7 +192,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#e0e0e
 
   <div class="map-area">
     <div id="map"></div>
-    <div class="table-area">
+    <button class="table-toggle" id="tableToggle" onclick="toggleTable()">Show table &#9660;</button>
+    <div class="table-area" id="tableArea">
       <table>
         <thead>
           <tr>
@@ -592,10 +647,43 @@ if ('Notification' in window && Notification.permission === 'default') {
   Notification.requestPermission();
 }
 
+// ═══════════════════════════════════════════════
+// MOBILE UI
+// ═══════════════════════════════════════════════
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sidebarOverlay');
+  const cl = sb.querySelector('.sidebar-close');
+  sb.classList.toggle('open');
+  ov.classList.toggle('show');
+  if (cl) cl.style.display = sb.classList.contains('open') ? 'block' : 'none';
+}
+function closeSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sidebarOverlay');
+  const cl = sb.querySelector('.sidebar-close');
+  sb.classList.remove('open');
+  ov.classList.remove('show');
+  if (cl) cl.style.display = 'none';
+  // Refresh map size after sidebar closes (fixes Leaflet rendering)
+  setTimeout(() => { if (map) map.invalidateSize(); }, 300);
+}
+function toggleTable() {
+  const ta = document.getElementById('tableArea');
+  const btn = document.getElementById('tableToggle');
+  ta.classList.toggle('open');
+  btn.innerHTML = ta.classList.contains('open') ? 'Hide table &#9650;' : 'Show table &#9660;';
+  setTimeout(() => { if (map) map.invalidateSize(); }, 350);
+}
+
 // Handle Enter on city input
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cityInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') applyCity();
+  });
+  // On resize, close sidebar if going desktop
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) closeSidebar();
   });
 });
 </script>
