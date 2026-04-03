@@ -168,8 +168,20 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#e0e0e
 // ═══════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════
-const API_DATA = 'https://neptun.in.ua/api/data';
-const API_ALARMS = 'https://neptun.in.ua/api/alarms/all';
+// CORS proxy list (fallback chain)
+const CORS_PROXIES = [
+  (u) => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u),
+  (u) => 'https://corsproxy.io/?' + encodeURIComponent(u),
+  (u) => u  // direct (works if same-origin or CORS enabled)
+];
+let activeProxyIndex = 0;
+
+function proxyUrl(url) {
+  return CORS_PROXIES[activeProxyIndex](url);
+}
+
+const BASE_DATA = 'https://neptun.in.ua/api/data';
+const BASE_ALARMS = 'https://neptun.in.ua/api/alarms/all';
 const POLL_DATA = 2000;
 const POLL_ALARMS = 10000;
 const NOTIFY_COOLDOWN = 30000;
@@ -265,10 +277,31 @@ function selectAllRegions(val) {
 // ═══════════════════════════════════════════════
 // NETWORK
 // ═══════════════════════════════════════════════
+async function fetchWithProxy(baseUrl) {
+  // Try current proxy first
+  const startIdx = activeProxyIndex;
+  for (let attempt = 0; attempt < CORS_PROXIES.length; attempt++) {
+    const idx = (startIdx + attempt) % CORS_PROXIES.length;
+    try {
+      const url = CORS_PROXIES[idx](baseUrl);
+      const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      if (idx !== activeProxyIndex) {
+        activeProxyIndex = idx;
+        console.log('Switched to proxy #' + idx);
+      }
+      return data;
+    } catch (e) {
+      console.warn('Proxy #' + idx + ' failed for ' + baseUrl + ':', e.message);
+    }
+  }
+  throw new Error('All proxies failed');
+}
+
 async function pollData() {
   try {
-    const resp = await fetch(API_DATA);
-    const d = await resp.json();
+    const d = await fetchWithProxy(BASE_DATA);
     fetchCount++;
     const newVer = d.markers_version;
     if (newVer !== markersVersion) {
@@ -283,14 +316,14 @@ async function pollData() {
       skipCount++;
     }
   } catch (e) {
-    document.getElementById('statusText').textContent = 'Connection error';
+    document.getElementById('statusText').textContent = '⚠ Connection error — retrying...';
   }
 }
 
 async function pollAlarms() {
   try {
-    const resp = await fetch(API_ALARMS);
-    alarmsData = await resp.json();
+    const d = await fetchWithProxy(BASE_ALARMS);
+    alarmsData = d;
     updateDisplay();
   } catch(e) {}
 }
