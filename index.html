@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NEPTUN — Трекер БПЛА</title>
+<title>Трекер БПЛА</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -143,10 +143,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#e0e0e
 
 <div class="header">
   <button class="menu-btn" id="menuBtn" onclick="toggleSidebar()">&#9776;</button>
-  <h1>NEPTUN</h1>
-  <span class="counter red" id="cntTargets">Targets: —</span>
-  <span class="counter orange" id="cntAlarms">Alerts: —</span>
-  <span class="status" id="statusText"><span class="live-dot"></span>Loading...</span>
+  <h1>ТРЕКЕР БПЛА</h1>
+  <span class="counter red" id="cntTargets">Цели: —</span>
+  <span class="counter orange" id="cntAlarms">Тревоги: —</span>
+  <span class="status" id="statusText"><span class="live-dot"></span>Загрузка...</span>
 </div>
 
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
@@ -155,57 +155,57 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#e0e0e
   <div class="sidebar" id="sidebar">
     <button class="sidebar-close" onclick="closeSidebar()" style="display:none">&times;</button>
     <!-- Threat types -->
-    <div class="section-title">Types</div>
+    <div class="section-title">Типы угроз</div>
     <div id="threatFilters"></div>
 
     <hr class="sep">
 
     <!-- Display options -->
-    <div class="section-title">Display</div>
-    <label class="filter-row"><input type="checkbox" id="chkTrajectory" checked> Trajectories</label>
-    <label class="filter-row"><input type="checkbox" id="chkPrediction" checked> Predicted route</label>
-    <label class="filter-row"><input type="checkbox" id="chkAlarms" checked> Region alerts</label>
+    <div class="section-title">Отображение</div>
+    <label class="filter-row"><input type="checkbox" id="chkTrajectory" checked> Траектории</label>
+    <label class="filter-row"><input type="checkbox" id="chkPrediction" checked> Прогноз маршрута</label>
+    <label class="filter-row"><input type="checkbox" id="chkAlarms" checked> Тревоги областей</label>
 
     <hr class="sep">
 
     <!-- City notifications -->
-    <div class="section-title">Notify city</div>
+    <div class="section-title">Уведомления по городу</div>
     <div class="city-block">
       <div class="city-input-row">
-        <input type="text" id="cityInput" placeholder="City name..." list="cityList">
+        <input type="text" id="cityInput" placeholder="Название города..." list="cityList">
         <datalist id="cityList"></datalist>
         <button onclick="applyCity()">OK</button>
       </div>
-      <div class="city-status" id="cityStatus">No city — no alerts</div>
+      <div class="city-status" id="cityStatus">Город не выбран — нет уведомлений</div>
     </div>
 
     <hr class="sep">
 
     <!-- Regions -->
-    <div class="section-title">Regions</div>
+    <div class="section-title">Области</div>
     <div class="btn-row">
-      <button class="btn-sm" onclick="selectAllRegions(true)">All</button>
-      <button class="btn-sm" onclick="selectAllRegions(false)">None</button>
+      <button class="btn-sm" onclick="selectAllRegions(true)">Все</button>
+      <button class="btn-sm" onclick="selectAllRegions(false)">Ничего</button>
     </div>
     <div class="region-list" id="regionList"></div>
   </div>
 
   <div class="map-area">
     <div id="map"></div>
-    <button class="table-toggle" id="tableToggle" onclick="toggleTable()">Show table &#9660;</button>
+    <button class="table-toggle" id="tableToggle" onclick="toggleTable()">Показать таблицу &#9660;</button>
     <div class="table-area" id="tableArea">
       <table>
         <thead>
           <tr>
-            <th>Type</th>
-            <th>Count</th>
-            <th>Region</th>
-            <th>Place</th>
-            <th>Dest</th>
-            <th>Speed</th>
-            <th>Bearing</th>
-            <th>Conf</th>
-            <th>Time</th>
+            <th>Тип</th>
+            <th>Кол-во</th>
+            <th>Область</th>
+            <th>Место</th>
+            <th>Цель</th>
+            <th>Скорость</th>
+            <th>Курс</th>
+            <th>Точн.</th>
+            <th>Время</th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -242,13 +242,13 @@ const POLL_ALARMS = 10000;
 const NOTIFY_COOLDOWN = 30000;
 
 const THREAT_TYPES = {
-  shahed:        { label: 'Shahed',      color: '#FF3232', rgb: [255,50,50] },
-  rozved:        { label: 'Recon UAV',   color: '#FFAA00', rgb: [255,170,0] },
-  vibuh:         { label: 'Explosion',   color: '#FF00FF', rgb: [255,0,255] },
-  uav:           { label: 'UAV',         color: '#FF6600', rgb: [255,102,0] },
-  missile:       { label: 'Missile',     color: '#CC00FF', rgb: [204,0,255] },
-  cruise_missile:{ label: 'Cruise mis.', color: '#CC00FF', rgb: [204,0,255] },
-  ballistic:     { label: 'Ballistic',   color: '#FF0066', rgb: [255,0,102] },
+  shahed:        { label: 'Шахед',       color: '#FF3232', rgb: [255,50,50] },
+  rozved:        { label: 'Разведка',    color: '#FFAA00', rgb: [255,170,0] },
+  vibuh:         { label: 'Взрыв',       color: '#FF00FF', rgb: [255,0,255] },
+  uav:           { label: 'БПЛА',        color: '#FF6600', rgb: [255,102,0] },
+  missile:       { label: 'Ракета',      color: '#CC00FF', rgb: [204,0,255] },
+  cruise_missile:{ label: 'Крылатая р.', color: '#CC00FF', rgb: [204,0,255] },
+  ballistic:     { label: 'Баллистика',  color: '#FF0066', rgb: [255,0,102] },
 };
 
 const REGIONS = {
@@ -298,7 +298,7 @@ function initMap() {
   map = L.map('map', { zoomControl: true }).setView([48.38, 31.17], 6);
   L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&hl=uk', {
     maxZoom: 18,
-    attribution: 'neptun.in.ua'
+    attribution: 'Трекер БПЛА'
   }).addTo(map);
 }
 
@@ -366,12 +366,12 @@ async function pollData() {
       updateDisplay();
       updateCityAutocomplete();
       document.getElementById('statusText').innerHTML =
-        `<span class="live-dot"></span>LIVE ${new Date().toLocaleTimeString()}`;
+        `<span class="live-dot"></span>ОНЛАЙН ${new Date().toLocaleTimeString()}`;
     } else {
       skipCount++;
     }
   } catch (e) {
-    document.getElementById('statusText').textContent = '⚠ Connection error — retrying...';
+    document.getElementById('statusText').textContent = 'Ошибка соединения — повтор...';
   }
 }
 
@@ -471,7 +471,7 @@ function updateDisplay() {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td style="color:${info.color}">${info.label}</td>
       <td>${count}</td><td>${region}</td><td>${t.place||''}</td>
-      <td>${dest}</td><td>${t.speed_kmh ? t.speed_kmh+' km/h' : '-'}</td>
+      <td>${dest}</td><td>${t.speed_kmh ? t.speed_kmh+' км/ч' : '-'}</td>
       <td>${bearing ? Math.round(bearing)+'°' : '-'}</td>
       <td>${t.confidence_0_100 ? t.confidence_0_100+'%' : '-'}</td>
       <td>${timeStr}</td>`;
@@ -482,7 +482,7 @@ function updateDisplay() {
       const icon = createDroneIcon(bearing, info.color, count);
       const marker = L.marker([t.lat, t.lng], { icon })
         .bindPopup(`<b>${info.label} x${count}</b><br>${t.place||''}<br>${region}<br>` +
-          `Speed: ${t.speed_kmh||'-'} km/h<br>Dest: ${dest}`);
+          `Скорость: ${t.speed_kmh||'-'} км/ч<br>Цель: ${dest}`);
       marker.addTo(map);
       droneMarkers.push(marker);
 
@@ -519,7 +519,7 @@ function updateDisplay() {
         const circle = L.circleMarker(coords, {
           radius: 12, color: '#ff0000', fillColor: '#ff0000',
           fillOpacity: 0.2, weight: 2, opacity: 0.6
-        }).bindPopup(`<b>AIR ALERT</b><br>${rn}`).addTo(map);
+        }).bindPopup(`<b>ВОЗДУШНАЯ ТРЕВОГА</b><br>${rn}`).addTo(map);
         alarmMarkers.push(circle);
       }
     }
@@ -527,16 +527,16 @@ function updateDisplay() {
 
   // Counters
   document.getElementById('cntTargets').textContent =
-    `Targets: ${targetCount} (${totalDrones})`;
+    `Цели: ${targetCount} (${totalDrones})`;
   document.getElementById('cntAlarms').textContent =
-    `Alerts: ${alarmCount}`;
+    `Тревоги: ${alarmCount}`;
 
   const parts = Object.entries(typeCounts)
     .sort((a,b) => b[1]-a[1])
     .map(([tt,c]) => `${(THREAT_TYPES[tt]||{label:tt}).label}: ${c}`);
-  document.getElementById('statsLeft').textContent = parts.join(' | ') || 'No active targets';
+  document.getElementById('statsLeft').textContent = parts.join(' | ') || 'Нет активных целей';
   document.getElementById('statsRight').textContent =
-    `${new Date().toLocaleTimeString()} | neptun.in.ua | v${markersVersion||'?'} req:${fetchCount} skip:${skipCount}`;
+    `${new Date().toLocaleTimeString()} | v${markersVersion||'?'} | запр:${fetchCount} проп:${skipCount}`;
 }
 
 // ═══════════════════════════════════════════════
@@ -546,14 +546,14 @@ function applyCity() {
   watchCity = document.getElementById('cityInput').value.trim();
   const statusEl = document.getElementById('cityStatus');
   if (watchCity) {
-    statusEl.textContent = `Notify: ${watchCity}`;
+    statusEl.textContent = `Уведомления: ${watchCity}`;
     statusEl.className = 'city-status active';
     // Reset known tracks to trigger immediate check
     knownTrackIds.clear();
     notifiedTimes = {};
     checkNotifications(targetsData);
   } else {
-    statusEl.textContent = 'No city — no alerts';
+    statusEl.textContent = 'Город не выбран — нет уведомлений';
     statusEl.className = 'city-status';
   }
 }
@@ -604,11 +604,11 @@ function checkNotifications(tracks) {
     // Show notification
     const title = `${info.label} x${t.count||1} -> ${watchCity}`;
     const lines = [];
-    if (place) lines.push(`Place: ${place}`);
-    if (region) lines.push(`Region: ${region}`);
-    if (courseDir) lines.push(`Direction: ${courseDir}`);
-    if (dest) lines.push(`Target: ${dest}`);
-    if (t.speed_kmh) lines.push(`Speed: ${t.speed_kmh} km/h`);
+    if (place) lines.push(`Место: ${place}`);
+    if (region) lines.push(`Область: ${region}`);
+    if (courseDir) lines.push(`Направление: ${courseDir}`);
+    if (dest) lines.push(`Цель: ${dest}`);
+    if (t.speed_kmh) lines.push(`Скорость: ${t.speed_kmh} км/ч`);
 
     showNotification(title, lines.join('\n'));
     notifiedTimes[tid] = now;
@@ -672,7 +672,7 @@ function toggleTable() {
   const ta = document.getElementById('tableArea');
   const btn = document.getElementById('tableToggle');
   ta.classList.toggle('open');
-  btn.innerHTML = ta.classList.contains('open') ? 'Hide table &#9650;' : 'Show table &#9660;';
+  btn.innerHTML = ta.classList.contains('open') ? 'Скрыть таблицу &#9650;' : 'Показать таблицу &#9660;';
   setTimeout(() => { if (map) map.invalidateSize(); }, 350);
 }
 
