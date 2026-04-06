@@ -188,6 +188,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#e0e0e
       <button class="btn-sm" onclick="selectAllRegions(false)">Ничего</button>
     </div>
     <div class="region-list" id="regionList"></div>
+
+    <hr class="sep">
+    <button class="btn-sm" onclick="clearAllCache()" style="background:#ff3232;color:#fff">Очистить кэш и перезагрузить</button>
   </div>
 
   <div class="map-area">
@@ -484,31 +487,63 @@ async function pollAlarms() {
   }
 }
 
-// Загрузка GeoJSON областей Украины (раз за сессию, с кэшем в localStorage)
-const GEOJSON_URL = 'https://raw.githubusercontent.com/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/UKR/ADM1/geoBoundaries-UKR-ADM1_simplified.geojson';
-const GEOJSON_CACHE_KEY = 'ua_geojson_v1';
+// Загрузка GeoJSON областей Украины — несколько источников с фолбэком
+const GEOJSON_SOURCES = [
+  'https://raw.githubusercontent.com/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/UKR/ADM1/geoBoundaries-UKR-ADM1_simplified.geojson',
+  'https://cdn.jsdelivr.net/gh/wmgeolab/geoBoundaries@9469f09/releaseData/gbOpen/UKR/ADM1/geoBoundaries-UKR-ADM1_simplified.geojson',
+  'https://raw.githubusercontent.com/wmgeolab/geoBoundaries/main/releaseData/gbOpen/UKR/ADM1/geoBoundaries-UKR-ADM1_simplified.geojson',
+];
+
+async function tryFetchJson(url) {
+  const resp = await fetch(url, { cache: 'force-cache' });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  return await resp.json();
+}
 
 async function loadUkraineGeoJson() {
-  // Сначала из кэша
-  try {
-    const cached = localStorage.getItem(GEOJSON_CACHE_KEY);
-    if (cached) {
-      ukraineGeoJson = JSON.parse(cached);
-      updateDisplay();
+  // Прямые источники
+  for (const url of GEOJSON_SOURCES) {
+    try {
+      console.log('GeoJSON: пробуем', url);
+      const data = await tryFetchJson(url);
+      if (data && data.features && data.features.length > 0) {
+        ukraineGeoJson = data;
+        console.log('GeoJSON: загружено', data.features.length, 'областей');
+        updateDisplay();
+        return;
+      }
+    } catch (e) {
+      console.warn('GeoJSON: упал', url, e.message);
     }
-  } catch(e) {}
-  // Потом обновляем с GitHub
-  try {
-    const resp = await fetch(GEOJSON_URL);
-    if (resp.ok) {
-      const data = await resp.json();
-      ukraineGeoJson = data;
-      try { localStorage.setItem(GEOJSON_CACHE_KEY, JSON.stringify(data)); } catch(e) {}
-      updateDisplay();
-    }
-  } catch(e) {
-    console.warn('GeoJSON load failed:', e.message);
   }
+  // Если все прямые упали — пробуем через CORS-прокси
+  for (const url of GEOJSON_SOURCES) {
+    for (const proxy of CORS_PROXIES) {
+      try {
+        const proxied = proxy.build(url);
+        console.log('GeoJSON: через прокси', proxy.name);
+        const data = await tryFetchJson(proxied);
+        if (data && data.features) {
+          ukraineGeoJson = data;
+          console.log('GeoJSON: загружено через прокси', proxy.name);
+          updateDisplay();
+          return;
+        }
+      } catch(e) {}
+    }
+  }
+  console.error('GeoJSON: все источники недоступны');
+}
+
+// Очистка кэша
+function clearAllCache() {
+  try {
+    localStorage.removeItem(CACHE_KEY_DATA);
+    localStorage.removeItem(CACHE_KEY_ALARMS);
+    localStorage.removeItem('ua_geojson_v1'); // старый ключ
+    localStorage.removeItem('ua_geojson_v2');
+  } catch(e) {}
+  location.reload();
 }
 
 // При старте — мгновенно отрисовать кэш, чтобы не было пустого экрана
