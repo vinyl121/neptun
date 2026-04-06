@@ -223,23 +223,26 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a1a2e;color:#e0e0e
 // ═══════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════
-// CORS proxy list (fallback chain)
+// CORS proxy pool — параллельные запросы через Promise.race
 const CORS_PROXIES = [
-  (u) => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u),
-  (u) => 'https://corsproxy.io/?' + encodeURIComponent(u),
-  (u) => u  // direct (works if same-origin or CORS enabled)
+  { name: 'codetabs',  build: (u) => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u) },
+  { name: 'corsproxy', build: (u) => 'https://corsproxy.io/?' + encodeURIComponent(u) },
+  { name: 'allorigins',build: (u) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u) },
+  { name: 'thingproxy',build: (u) => 'https://thingproxy.freeboard.io/fetch/' + u },
+  { name: 'cors.sh',   build: (u) => 'https://proxy.cors.sh/' + u },
+  { name: 'direct',    build: (u) => u },
 ];
-let activeProxyIndex = 0;
-
-function proxyUrl(url) {
-  return CORS_PROXIES[activeProxyIndex](url);
-}
+let lastWinningProxy = null;
+let consecutiveFailures = 0;
 
 const BASE_DATA = 'https://neptun.in.ua/api/data';
 const BASE_ALARMS = 'https://neptun.in.ua/api/alarms/all';
 const POLL_DATA = 2000;
 const POLL_ALARMS = 10000;
 const NOTIFY_COOLDOWN = 30000;
+const CACHE_KEY_DATA = 'neptun_cache_data';
+const CACHE_KEY_ALARMS = 'neptun_cache_alarms';
+const STALE_THRESHOLD_MS = 60000; // если данные старше минуты — помечаем как устаревшие
 
 const THREAT_TYPES = {
   shahed:        { label: 'Шахед',       color: '#FF3232', rgb: [255,50,50] },
@@ -288,6 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMap();
   initFilters();
   initRegions();
+  loadInitialCache();
   pollData();
   pollAlarms();
   setInterval(pollData, POLL_DATA);
@@ -330,34 +334,79 @@ function selectAllRegions(val) {
 }
 
 // ═══════════════════════════════════════════════
-// NETWORK
+// NETWORK — параллельные запросы через все прокси, побеждает быстрейший
 // ═══════════════════════════════════════════════
-async function fetchWithProxy(baseUrl) {
-  // Try current proxy first
-  const startIdx = activeProxyIndex;
-  for (let attempt = 0; attempt < CORS_PROXIES.length; attempt++) {
-    const idx = (startIdx + attempt) % CORS_PROXIES.length;
-    try {
-      const url = CORS_PROXIES[idx](baseUrl);
-      const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const data = await resp.json();
-      if (idx !== activeProxyIndex) {
-        activeProxyIndex = idx;
-        console.log('Switched to proxy #' + idx);
-      }
-      return data;
-    } catch (e) {
-      console.warn('Proxy #' + idx + ' failed for ' + baseUrl + ':', e.message);
+function saveCache(key, data) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
+  } catch(e) {}
+}
+
+function loadCache(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch(e) { return null; }
+}
+
+async function fetchOneProxy(proxy, baseUrl, signal) {
+  const url = proxy.build(baseUrl);
+  const resp = await fetch(url, { signal });
+  if (!resp.ok) throw new Error(proxy.name + ' HTTP ' + resp.status);
+  const text = await resp.text();
+  // Защита от HTML-ответов прокси (заглушки/ошибки)
+  if (text.trim().startsWith('<')) throw new Error(proxy.name + ' returned HTML');
+  const data = JSON.parse(text);
+  return { data, proxyName: proxy.name };
+}
+
+async function raceFetch(baseUrl, timeoutMs = 8000) {
+  // Если есть фаворит — пробуем его первым с приоритетом
+  const ordered = [...CORS_PROXIES];
+  if (lastWinningProxy) {
+    const idx = ordered.findIndex(p => p.name === lastWinningProxy);
+    if (idx > 0) {
+      const fav = ordered.splice(idx, 1)[0];
+      ordered.unshift(fav);
     }
   }
-  throw new Error('All proxies failed');
+  const ctrl = new AbortController();
+  const timeoutId = setTimeout(() => ctrl.abort(), timeoutMs);
+  const promises = ordered.map(p =>
+    fetchOneProxy(p, baseUrl, ctrl.signal).catch(e => Promise.reject(e))
+  );
+  try {
+    const result = await Promise.any(promises);
+    ctrl.abort(); // отменяем остальные
+    clearTimeout(timeoutId);
+    lastWinningProxy = result.proxyName;
+    consecutiveFailures = 0;
+    return result.data;
+  } catch (e) {
+    clearTimeout(timeoutId);
+    consecutiveFailures++;
+    throw new Error('all proxies failed');
+  }
+}
+
+function updateStatusIndicator(state, extra = '') {
+  const el = document.getElementById('statusText');
+  const t = new Date().toLocaleTimeString();
+  if (state === 'live') {
+    el.innerHTML = `<span class="live-dot"></span>ОНЛАЙН ${t} <span style="color:#666">[${lastWinningProxy||'?'}]</span>`;
+  } else if (state === 'stale') {
+    el.innerHTML = `<span class="live-dot" style="background:#ffaa00"></span>УСТАРЕЛО ${extra}`;
+  } else if (state === 'offline') {
+    el.innerHTML = `<span class="live-dot" style="background:#ff3232"></span>НЕТ СВЯЗИ — повтор...`;
+  }
 }
 
 async function pollData() {
   try {
-    const d = await fetchWithProxy(BASE_DATA);
+    const d = await raceFetch(BASE_DATA);
     fetchCount++;
+    saveCache(CACHE_KEY_DATA, d);
     const newVer = d.markers_version;
     if (newVer !== markersVersion) {
       markersVersion = newVer;
@@ -365,22 +414,57 @@ async function pollData() {
       checkNotifications(targetsData);
       updateDisplay();
       updateCityAutocomplete();
-      document.getElementById('statusText').innerHTML =
-        `<span class="live-dot"></span>ОНЛАЙН ${new Date().toLocaleTimeString()}`;
     } else {
       skipCount++;
     }
+    updateStatusIndicator('live');
   } catch (e) {
-    document.getElementById('statusText').textContent = 'Ошибка соединения — повтор...';
+    // Падение — пробуем кэш
+    const cached = loadCache(CACHE_KEY_DATA);
+    if (cached) {
+      const ageSec = Math.round((Date.now() - cached.ts) / 1000);
+      const ageStr = ageSec < 60 ? ageSec + 'с' : Math.round(ageSec/60) + 'мин';
+      // Показываем кэш только если ещё не отрисован
+      if (targetsData.length === 0 && cached.data.tracks) {
+        targetsData = cached.data.tracks || [];
+        markersVersion = cached.data.markers_version;
+        updateDisplay();
+        updateCityAutocomplete();
+      }
+      updateStatusIndicator('stale', `(${ageStr} назад)`);
+    } else {
+      updateStatusIndicator('offline');
+    }
   }
 }
 
 async function pollAlarms() {
   try {
-    const d = await fetchWithProxy(BASE_ALARMS);
+    const d = await raceFetch(BASE_ALARMS);
     alarmsData = d;
+    saveCache(CACHE_KEY_ALARMS, d);
     updateDisplay();
-  } catch(e) {}
+  } catch(e) {
+    const cached = loadCache(CACHE_KEY_ALARMS);
+    if (cached && alarmsData.length === 0) {
+      alarmsData = cached.data;
+      updateDisplay();
+    }
+  }
+}
+
+// При старте — мгновенно отрисовать кэш, чтобы не было пустого экрана
+function loadInitialCache() {
+  const cd = loadCache(CACHE_KEY_DATA);
+  if (cd && cd.data.tracks) {
+    targetsData = cd.data.tracks || [];
+    markersVersion = cd.data.markers_version;
+    const ageSec = Math.round((Date.now() - cd.ts) / 1000);
+    updateStatusIndicator('stale', `(кэш ${ageSec}с)`);
+  }
+  const ca = loadCache(CACHE_KEY_ALARMS);
+  if (ca) alarmsData = ca.data;
+  if (cd || ca) updateDisplay();
 }
 
 // ═══════════════════════════════════════════════
