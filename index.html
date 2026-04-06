@@ -270,8 +270,55 @@ const REGIONS = {
   "Харківська область":[49.9935,36.2304],"Херсонська область":[46.6354,32.6169],
   "Хмельницька область":[49.423,26.9871],"Черкаська область":[49.4444,32.0598],
   "Чернівецька область":[48.292,25.9358],"Чернігівська область":[51.4982,31.2893],
-  "м. Київ":[50.4501,30.5234]
+  "м. Київ":[50.4501,30.5234],
+  "Автономна Республіка Крим":[45.0,34.0]
 };
+
+// Стемы для нормализации названий из API (порядок важен — Київськ до Київ!)
+const REGION_STEMS = [
+  ["Вінниц","Вінницька область"],
+  ["Волин","Волинська область"],
+  ["Дніпропетров","Дніпропетровська область"],
+  ["Дніпр","Дніпропетровська область"],
+  ["Донеч","Донецька область"],
+  ["Донецьк","Донецька область"],
+  ["Житомир","Житомирська область"],
+  ["Закарпат","Закарпатська область"],
+  ["Запоріж","Запорізька область"],
+  ["Запорізьк","Запорізька область"],
+  ["Івано-Франків","Івано-Франківська область"],
+  ["Кіровоград","Кіровоградська область"],
+  ["Луганщин","Луганська область"],
+  ["Луганськ","Луганська область"],
+  ["Львів","Львівська область"],
+  ["Миколаїв","Миколаївська область"],
+  ["Одес","Одеська область"],
+  ["Полтав","Полтавська область"],
+  ["Рівнен","Рівненська область"],
+  ["Рівне","Рівненська область"],
+  ["Сумськ","Сумська область"],
+  ["Сумщин","Сумська область"],
+  ["Тернопіль","Тернопільська область"],
+  ["Тернопіл","Тернопільська область"],
+  ["Харків","Харківська область"],
+  ["Херсон","Херсонська область"],
+  ["Хмельниц","Хмельницька область"],
+  ["Черка","Черкаська область"],
+  ["Чернівец","Чернівецька область"],
+  ["Чернігів","Чернігівська область"],
+  ["Київськ","Київська область"],
+  ["Крим","Автономна Республіка Крим"],
+  ["Київ","м. Київ"]
+];
+
+function normalizeAlarmRegion(name) {
+  if (!name) return null;
+  if (REGIONS[name]) return name;
+  for (const [stem, uk] of REGION_STEMS) {
+    if (name.includes(stem)) return uk;
+  }
+  return null;
+}
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -314,7 +361,8 @@ const REGION_NAME_MAP = {
   "Poltava Oblast":"Полтавська область",
   "Dnipropetrovsk Oblast":"Дніпропетровська область",
   "Kirovohrad Oblast":"Кіровоградська область",
-  "Kyiv":"м. Київ"
+  "Kyiv":"м. Київ",
+  "Autonomous Republic of Crimea":"Автономна Республіка Крим"
 };
 
 // ═══════════════════════════════════════════════
@@ -488,10 +536,11 @@ async function pollAlarms() {
 }
 
 // Загрузка GeoJSON областей Украины — несколько источников с фолбэком
+// ВАЖНО: raw.githubusercontent.com и jsdelivr возвращают Git LFS pointer файлы.
+// Реальный контент отдаёт media.githubusercontent.com (через /raw/ редирект GitHub).
 const GEOJSON_SOURCES = [
-  'https://raw.githubusercontent.com/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/UKR/ADM1/geoBoundaries-UKR-ADM1_simplified.geojson',
-  'https://cdn.jsdelivr.net/gh/wmgeolab/geoBoundaries@9469f09/releaseData/gbOpen/UKR/ADM1/geoBoundaries-UKR-ADM1_simplified.geojson',
-  'https://raw.githubusercontent.com/wmgeolab/geoBoundaries/main/releaseData/gbOpen/UKR/ADM1/geoBoundaries-UKR-ADM1_simplified.geojson',
+  'https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09592ced973a3448cf66b6100b741b64c0d/releaseData/gbOpen/UKR/ADM1/geoBoundaries-UKR-ADM1_simplified.geojson',
+  'https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/main/releaseData/gbOpen/UKR/ADM1/geoBoundaries-UKR-ADM1_simplified.geojson',
 ];
 
 async function tryFetchJson(url) {
@@ -688,13 +737,12 @@ function updateDisplay() {
   const alarmedRegions = new Set();
   if (showAlarms) {
     for (const entry of alarmsData) {
-      if (entry.regionType !== 'State') continue;
       if (!entry.activeAlerts?.some(a => a.type === 'AIR')) continue;
-      const rn = entry.regionName;
-      if (!regions.has(rn)) continue;
-      alarmCount++;
-      alarmedRegions.add(rn);
+      const norm = normalizeAlarmRegion(entry.regionName);
+      if (!norm) continue;
+      alarmedRegions.add(norm);
     }
+    alarmCount = alarmedRegions.size;
   }
 
   // Подсветка областей полигонами из GeoJSON
