@@ -282,7 +282,37 @@ let knownTrackIds = new Set();
 let notifiedTimes = {};
 
 // Map layers
-let map, droneMarkers = [], pathLayers = [], alarmMarkers = [];
+let map, droneMarkers = [], pathLayers = [], alarmMarkers = [], alarmPolygons = [];
+let ukraineGeoJson = null;
+
+// Маппинг английских названий из GeoJSON в наши украинские
+const REGION_NAME_MAP = {
+  "Kherson Oblast":"Херсонська область",
+  "Volyn Oblast":"Волинська область",
+  "Rivne Oblast":"Рівненська область",
+  "Zhytomyr Oblast":"Житомирська область",
+  "Kyiv Oblast":"Київська область",
+  "Chernihiv Oblast":"Чернігівська область",
+  "Sumy Oblast":"Сумська область",
+  "Kharkiv Oblast":"Харківська область",
+  "Luhansk Oblast":"Луганська область",
+  "Donetsk Oblast":"Донецька область",
+  "Zaporizhia Oblast":"Запорізька область",
+  "Lviv Oblast":"Львівська область",
+  "Ivano-Frankivsk Oblast":"Івано-Франківська область",
+  "Zakarpattia Oblast":"Закарпатська область",
+  "Ternopil Oblast":"Тернопільська область",
+  "Chernivtsi Oblast":"Чернівецька область",
+  "Odessa Oblast":"Одеська область",
+  "Mykolaiv Oblast":"Миколаївська область",
+  "Vinnytsia Oblast":"Вінницька область",
+  "Khmelnytskyi Oblast":"Хмельницька область",
+  "Cherkasy Oblast":"Черкаська область",
+  "Poltava Oblast":"Полтавська область",
+  "Dnipropetrovsk Oblast":"Дніпропетровська область",
+  "Kirovohrad Oblast":"Кіровоградська область",
+  "Kyiv":"м. Київ"
+};
 
 // ═══════════════════════════════════════════════
 // INIT
@@ -292,6 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initFilters();
   initRegions();
   loadInitialCache();
+  loadUkraineGeoJson();
   pollData();
   pollAlarms();
   setInterval(pollData, POLL_DATA);
@@ -453,6 +484,33 @@ async function pollAlarms() {
   }
 }
 
+// Загрузка GeoJSON областей Украины (раз за сессию, с кэшем в localStorage)
+const GEOJSON_URL = 'https://raw.githubusercontent.com/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/UKR/ADM1/geoBoundaries-UKR-ADM1_simplified.geojson';
+const GEOJSON_CACHE_KEY = 'ua_geojson_v1';
+
+async function loadUkraineGeoJson() {
+  // Сначала из кэша
+  try {
+    const cached = localStorage.getItem(GEOJSON_CACHE_KEY);
+    if (cached) {
+      ukraineGeoJson = JSON.parse(cached);
+      updateDisplay();
+    }
+  } catch(e) {}
+  // Потом обновляем с GitHub
+  try {
+    const resp = await fetch(GEOJSON_URL);
+    if (resp.ok) {
+      const data = await resp.json();
+      ukraineGeoJson = data;
+      try { localStorage.setItem(GEOJSON_CACHE_KEY, JSON.stringify(data)); } catch(e) {}
+      updateDisplay();
+    }
+  } catch(e) {
+    console.warn('GeoJSON load failed:', e.message);
+  }
+}
+
 // При старте — мгновенно отрисовать кэш, чтобы не было пустого экрана
 function loadInitialCache() {
   const cd = loadCache(CACHE_KEY_DATA);
@@ -525,7 +583,8 @@ function updateDisplay() {
   droneMarkers.forEach(m => map.removeLayer(m));
   pathLayers.forEach(p => map.removeLayer(p));
   alarmMarkers.forEach(m => map.removeLayer(m));
-  droneMarkers = []; pathLayers = []; alarmMarkers = [];
+  alarmPolygons.forEach(p => map.removeLayer(p));
+  droneMarkers = []; pathLayers = []; alarmMarkers = []; alarmPolygons = [];
 
   const tbody = document.getElementById('tableBody');
   tbody.innerHTML = '';
@@ -589,8 +648,9 @@ function updateDisplay() {
     }
   }
 
-  // Alarms
+  // Alarms — собираем активные тревоги
   let alarmCount = 0;
+  const alarmedRegions = new Set();
   if (showAlarms) {
     for (const entry of alarmsData) {
       if (entry.regionType !== 'State') continue;
@@ -598,11 +658,37 @@ function updateDisplay() {
       const rn = entry.regionName;
       if (!regions.has(rn)) continue;
       alarmCount++;
+      alarmedRegions.add(rn);
+    }
+  }
+
+  // Подсветка областей полигонами из GeoJSON
+  if (showAlarms && ukraineGeoJson && alarmedRegions.size > 0) {
+    for (const feat of ukraineGeoJson.features) {
+      const engName = feat.properties.shapeName;
+      const ukName = REGION_NAME_MAP[engName];
+      if (!ukName || !alarmedRegions.has(ukName)) continue;
+      const layer = L.geoJSON(feat, {
+        style: {
+          color: '#ff0000',
+          weight: 2,
+          opacity: 0.85,
+          fillColor: '#ff0000',
+          fillOpacity: 0.25,
+          dashArray: '4,4'
+        }
+      }).bindPopup(`<b>ВОЗДУШНАЯ ТРЕВОГА</b><br>${ukName}`).addTo(map);
+      alarmPolygons.push(layer);
+    }
+  }
+  // Фолбэк: если GeoJSON ещё не загружен — рисуем кружки в центрах областей
+  if (showAlarms && !ukraineGeoJson) {
+    for (const rn of alarmedRegions) {
       const coords = REGIONS[rn];
       if (coords) {
         const circle = L.circleMarker(coords, {
-          radius: 12, color: '#ff0000', fillColor: '#ff0000',
-          fillOpacity: 0.2, weight: 2, opacity: 0.6
+          radius: 14, color: '#ff0000', fillColor: '#ff0000',
+          fillOpacity: 0.3, weight: 2, opacity: 0.7
         }).bindPopup(`<b>ВОЗДУШНАЯ ТРЕВОГА</b><br>${rn}`).addTo(map);
         alarmMarkers.push(circle);
       }
